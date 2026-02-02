@@ -1,5 +1,7 @@
-
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+
+// Fix: Declare Deno to satisfy TypeScript in non-Deno specific project configurations
+declare const Deno: any;
 
 /**
  * CONFIGURATION MAILJET OFFICIELLE UPG
