@@ -40,7 +40,10 @@ import {
   Calendar,
   RefreshCw,
   ChevronRight,
-  FileCheck
+  FileCheck,
+  Search,
+  Inbox,
+  Eye
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -48,6 +51,7 @@ const App: React.FC = () => {
   const [loadingNews, setLoadingNews] = useState(true);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchNews();
@@ -77,7 +81,8 @@ const App: React.FC = () => {
           author: item.author || 'Direction UPG',
           category: item.category,
           date: new Date(item.publish_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }),
-          image: item.image_url || 'https://picsum.photos/id/24/800/600'
+          image: item.image_url || 'https://picsum.photos/id/24/800/600',
+          views: item.views || 0
         })));
       } else {
         setNews(INITIAL_NEWS);
@@ -87,6 +92,21 @@ const App: React.FC = () => {
       setNews(INITIAL_NEWS);
     } finally {
       setLoadingNews(false);
+    }
+  };
+
+  const handleSelectNews = async (item: NewsItem) => {
+    setSelectedNews(item);
+    
+    // Incrémentation des vues
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.rpc('increment_news_views', { news_id: item.id });
+        // Mise à jour locale immédiate pour l'UI
+        setNews(prev => prev.map(n => n.id === item.id ? { ...n, views: (n.views || 0) + 1 } : n));
+      } catch (err) {
+        console.error("Erreur increment vues:", err);
+      }
     }
   };
 
@@ -100,7 +120,8 @@ const App: React.FC = () => {
           author: newItem.author,
           category: newItem.category,
           image_url: newItem.image,
-          publish_date: new Date().toISOString()
+          publish_date: new Date().toISOString(),
+          views: 0
         }
       ]);
       if (error) throw error;
@@ -110,6 +131,12 @@ const App: React.FC = () => {
       throw e;
     }
   };
+
+  const filteredNews = news.filter(item => 
+    item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen font-sans transition-colors duration-300">
@@ -289,15 +316,26 @@ Forte d’un environnement d’apprentissage innovant et inclusif, l’UPG encou
       {/* News Section */}
       <section id="news" className="py-24 bg-slate-50 dark:bg-slate-900">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
+          <div className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
             <div>
               <h2 className="text-4xl font-serif font-bold text-upgBlue dark:text-white mb-4">Dernières Nouvelles</h2>
               <div className="w-24 h-1 bg-upgGold mb-6"></div>
             </div>
-            <div className="flex gap-4">
-               <button 
+            
+            <div className="flex flex-1 max-w-xl items-center gap-3 w-full">
+              <div className="relative flex-1 group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-upgGold transition-colors" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Rechercher un communiqué..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-upgGold/30 dark:text-white text-sm transition-all shadow-sm"
+                />
+              </div>
+              <button 
                 onClick={fetchNews}
-                className="p-3 bg-white dark:bg-slate-800 rounded-xl hover:text-upgGold transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
+                className="p-3.5 bg-white dark:bg-slate-800 rounded-2xl text-slate-600 dark:text-slate-300 hover:text-upgGold transition-all border border-slate-200 dark:border-slate-700 shadow-sm active:scale-95"
                 title="Actualiser les news"
               >
                 <RefreshCw size={20} className={loadingNews ? "animate-spin" : ""} />
@@ -305,29 +343,50 @@ Forte d’un environnement d’apprentissage innovant et inclusif, l’UPG encou
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {news.map((item) => (
-              <div key={item.id} className="bg-white dark:bg-slate-950 rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-slate-100 dark:border-slate-800 flex flex-col group">
-                <div className="relative h-56 overflow-hidden">
-                  <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.title} />
-                  <div className="absolute top-4 left-4 bg-upgGold text-upgBlue px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">{item.category}</div>
-                </div>
-                <div className="p-8 flex-1 flex flex-col">
-                  <div className="flex items-center gap-2 text-slate-400 text-xs mb-4">
-                    <Calendar size={14} /> {item.date}
+          {filteredNews.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredNews.map((item) => (
+                <div key={item.id} className="bg-white dark:bg-slate-950 rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-slate-100 dark:border-slate-800 flex flex-col group animate-in fade-in duration-500">
+                  <div className="relative h-56 overflow-hidden">
+                    <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.title} />
+                    <div className="absolute top-4 left-4 bg-upgGold text-upgBlue px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">{item.category}</div>
+                    
+                    {/* Badge de vues en temps réel */}
+                    <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-md text-white px-3 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-lg border border-white/10">
+                      <Eye size={12} className="text-upgGold" /> {item.views || 0} vues
+                    </div>
                   </div>
-                  <h3 className="text-xl font-bold text-upgBlue dark:text-white mb-4 leading-tight">{item.title}</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 flex-1 line-clamp-3 leading-relaxed">{item.content}</p>
-                  <button 
-                    onClick={() => setSelectedNews(item)}
-                    className="text-upgGold font-bold text-xs uppercase tracking-widest flex items-center gap-2 hover:gap-4 transition-all"
-                  >
-                    En savoir plus <ArrowRight size={14} />
-                  </button>
+                  <div className="p-8 flex-1 flex flex-col">
+                    <div className="flex items-center gap-2 text-slate-400 text-xs mb-4">
+                      <Calendar size={14} /> {item.date}
+                    </div>
+                    <h3 className="text-xl font-bold text-upgBlue dark:text-white mb-4 leading-tight">{item.title}</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 flex-1 line-clamp-3 leading-relaxed">{item.content}</p>
+                    <button 
+                      onClick={() => handleSelectNews(item)}
+                      className="text-upgGold font-bold text-xs uppercase tracking-widest flex items-center gap-2 hover:gap-4 transition-all"
+                    >
+                      En savoir plus <ArrowRight size={14} />
+                    </button>
+                  </div>
                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-20 text-center space-y-4 animate-in fade-in zoom-in-95 duration-300">
+              <div className="bg-slate-100 dark:bg-slate-800 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Inbox size={40} className="text-slate-400" />
               </div>
-            ))}
-          </div>
+              <h3 className="text-xl font-bold text-upgBlue dark:text-white">Aucun résultat pour "{searchQuery}"</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">Essayez d'autres mots-clés ou vérifiez l'orthographe.</p>
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="text-upgGold font-bold text-xs uppercase tracking-widest hover:underline"
+              >
+                Réinitialiser la recherche
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
