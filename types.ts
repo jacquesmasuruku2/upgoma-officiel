@@ -14,6 +14,7 @@ export interface NewsItem {
   author: string; 
   image?: string;
   category: 'Actualité' | 'Événement' | 'Annonce';
+  views?: number;
 }
 
 export interface NavItem {
@@ -37,7 +38,7 @@ export interface RegistrationData {
   birthDate: string;
   birthPlace: string;
   gender: 'M' | 'F';
-  maritalStatus: 'Célibataire' | 'Marié(e)' | 'Divorcé(e)' | 'Veuf(ve)';
+  maritalStatus: 'Célibataire' | 'Marié(e)' | 'Divorcé(e)' | 'Séparé(e)' | 'Veuf(ve)';
   previousSchool: string;
   targetFaculty: string;
   targetDepartment: string;
