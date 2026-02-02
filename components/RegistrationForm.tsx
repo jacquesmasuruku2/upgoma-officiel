@@ -8,8 +8,8 @@ import { supabase, isSupabaseConfigured } from '../supabaseClient';
 const RegistrationForm: React.FC = () => {
   const [step, setStep] = useState<FormStep>(FormStep.IDENTITY);
   const [formData, setFormData] = useState<Partial<RegistrationData>>({
-    gender: 'M', // Valeur par défaut valide pour éviter la violation de contrainte
-    maritalStatus: 'Célibataire', // Correction de la faute de frappe pour correspondre au type et à la DB
+    gender: undefined,
+    maritalStatus: undefined,
     firstName: '',
     lastName: '',
     middleName: '',
@@ -72,7 +72,6 @@ const RegistrationForm: React.FC = () => {
       let academicDocsUrl = "";
       const timestamp = Date.now();
 
-      // 1. Upload de la Photo
       if (formData.passportPhoto) {
         const ext = formData.passportPhoto.name.split('.').pop()?.toLowerCase();
         const filePath = `public/photo-${timestamp}-${Math.random().toString(36).substring(7)}.${ext}`;
@@ -85,7 +84,6 @@ const RegistrationForm: React.FC = () => {
         passportPhotoUrl = data.path;
       }
 
-      // 2. Upload du Document Académique (PDF)
       if (formData.documents && formData.documents.length > 0) {
         const docFile = formData.documents[0];
         const ext = docFile.name.split('.').pop()?.toLowerCase();
@@ -93,13 +91,12 @@ const RegistrationForm: React.FC = () => {
         
         const { data, error: docError } = await supabase.storage
           .from('form_site_files')
-          .upload(filePath, docFile);
+          .upload(filePath, formData.documents[0]);
         
         if (docError) throw new Error(`Erreur Document: ${docError.message}`);
         academicDocsUrl = data.path;
       }
 
-      // 3. Insertion finale en base de données
       const { error: dbError } = await supabase.from('registrations').insert([
         {
           first_name: formData.firstName,
@@ -121,7 +118,6 @@ const RegistrationForm: React.FC = () => {
 
       if (dbError) throw dbError;
 
-      // 4. Déclenchement de l'envoi d'email via Supabase Edge Function
       supabase.functions.invoke('send-confirmation-email', {
         body: {
           email: formData.email,
@@ -211,14 +207,29 @@ const RegistrationForm: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sexe</label>
-                <select name="gender" value={formData.gender} onChange={handleChange} className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl outline-none dark:text-white">
+                <select required name="gender" value={formData.gender || ''} onChange={handleChange} className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl outline-none dark:text-white border border-transparent">
+                  <option value="" disabled>Sélectionner le sexe</option>
                   <option value="M">Masculin</option>
                   <option value="F">Féminin</option>
                 </select>
               </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">État Matrimonial</label>
+                <select required name="maritalStatus" value={formData.maritalStatus || ''} onChange={handleChange} className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl outline-none dark:text-white border border-transparent">
+                  <option value="" disabled>Sélectionner l'état civil</option>
+                  <option value="Célibataire">Célibataire</option>
+                  <option value="Marié(e)">Marié(e)</option>
+                  <option value="Divorcé(e)">Divorcé(e)</option>
+                  <option value="Séparé(e)">Séparé(e)</option>
+                  <option value="Veuf(ve)">Veuf(ve)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date Naissance</label>
                 <input required type="date" name="birthDate" value={formData.birthDate || ''} onChange={handleChange} className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl outline-none dark:text-white" />
@@ -293,7 +304,7 @@ const RegistrationForm: React.FC = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-6 p-6 bg-slate-50 dark:bg-slate-800 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-upgGold transition-colors">
                 <div className="w-20 h-24 bg-white dark:bg-slate-900 rounded-lg flex items-center justify-center overflow-hidden border border-slate-100 dark:border-slate-700 shadow-sm">
-                  {formData.passportPhoto ? <img src={URL.createObjectURL(formData.passportPhoto)} className="w-full h-full object-cover" /> : <Camera size={32} className="text-slate-300" />}
+                  {formData.passportPhoto ? <img src={URL.createObjectURL(formData.passportPhoto)} className="w-full h-full object-contain" /> : <Camera size={32} className="text-slate-300" />}
                 </div>
                 <div>
                   <input type="file" name="passportPhoto" accept="image/*" onChange={handleFileChange} className="hidden" id="photo-upload" />
